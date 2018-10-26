@@ -2,7 +2,9 @@
 #include <assert.h>
 #include <string.h>
 #include <math.h>
-const int MAX = 5000;  //Максимальные U и I
+#include <stdlib.h>
+const double MIN = 0;
+const double MAX = 5000;  //Максимальные U и I
 const int ERROR = -1;
 const int nmeas = 12;
 const int len1 = 20;
@@ -11,40 +13,57 @@ const int len3 = 50;
 const double S = 0.00107;
 const double amp_err = 1.875;
 const double maxI = 400;
+const double tol = 3e-8;
 double R_len1 = 0, R_len2 = 0, R_len3 = 0;  //ВНИМАНИЕ: глобальные переменные
-int Read_Data(double I[], double U_len1[], double U_len2[], double U_len3[]);
+                                            //Функции
+int Read_Data(double *I, double *U_len1, double *U_len2, double *U_len3, char read_file[]);
 double Least_Square(double U[], double I[]);
-void Calculate(double I[], double U_len1[], double U_len2[], double U_len3[], double *p_len1, double *p_len2, double *p_len3, double *sigma_len1, double *sigma_len2, double *sigma_len3);
+void Calculate(double I[], double U_len1[], double U_len2[], double U_len3[], \
+               double *p_len1, double *p_len2, double *p_len3, \
+			   double *sigma_len1, double *sigma_len2, double *sigma_len3);
 double Rand_Error(double U[], double I[], double R);
-int Write_Data (double *p_len1, double *p_len2, double *p_len3, double *sigma_len1, double *sigma_len2, double *sigma_len3); 
+int Write_Data (double *p_len1, double *p_len2, double *p_len3, \
+                double *sigma_len1, double *sigma_len2, double *sigma_len3, char write_file[]); 
+void MyFree (double **arr);
 
 //-------------------------------------------------------------------------------------------------------------------------------------	
 
 int main()
 {
 	double p_len1 = 0, p_len2 = 0, p_len3 = 0, sigma_len1 = 0, sigma_len2 = 0, sigma_len3 = 0;
-	double I[nmeas], U_len1[nmeas], U_len2[nmeas], U_len3[nmeas];
-	memset (I, 0, nmeas*sizeof(double));
-	memset (U_len1, 0, nmeas*sizeof(double));
-	memset (U_len2, 0, nmeas*sizeof(double));
-	memset (U_len3, 0, nmeas*sizeof(double));
-	if (Read_Data(I, U_len1, U_len2, U_len3) == ERROR) {printf("Function Read_Data failed.\n"); return ERROR;}
+	char read_file[] = {"data.txt"};
+	char write_file[] = {"result.txt"};
+	double *I = calloc(nmeas, sizeof(double));
+	double *U_len1 = calloc(nmeas, sizeof(double));
+	double *U_len2 = calloc(nmeas, sizeof(double));
+	double *U_len3 = calloc(nmeas, sizeof(double));
+	if (I == NULL || U_len1 == NULL || U_len2 == NULL || U_len3 == NULL)
+		{printf("Can't create array.\n"); return ERROR;}
+	if (Read_Data(I, U_len1, U_len2, U_len3, read_file) == ERROR)
+		{printf("Function Read_Data failed.\n"); return ERROR;}
 	Calculate(I, U_len1, U_len2, U_len3, &p_len1, &p_len2, &p_len3, &sigma_len1, &sigma_len2, &sigma_len3);
-	if (Write_Data(&p_len1, &p_len2, &p_len3, &sigma_len1, &sigma_len2, &sigma_len3) == ERROR) {printf("Function Write_Data failed.\n"); return ERROR;}
+	if (Write_Data(&p_len1, &p_len2, &p_len3, &sigma_len1, &sigma_len2, &sigma_len3, write_file) == ERROR)
+		{printf("Function Write_Data failed.\n"); return ERROR;}
+	MyFree(&I);
+	MyFree(&U_len1);
+	MyFree(&U_len2);
+	MyFree(&U_len3);
 	return 0;
 }
 
 //-------------------------------------------------------------------------------------------------------------------------------------	
 
-int Read_Data(double I[], double U_len1[], double U_len2[], double U_len3[])
+int Read_Data(double *I, double *U_len1, double *U_len2, double *U_len3, char read_file[])
 {
-	FILE* read = fopen("data.txt", "r");
+	FILE* read = fopen(read_file, "r");
 	if (!read) {printf("Cannot open data.txt.\n"); return ERROR;}
 	fscanf (read, "%*s %*s %*s %*s %*s %*s %*s");  //Пропуск заголовков
 	int line = 0;
 	for(;;) {
 		if (EOF == fscanf (read, "%lg %lg %lg %lg", &I[line], &U_len1[line], &U_len2[line], &U_len3[line])) break;
-		if (I[line]<=0 || I[line]>MAX || U_len1[line]<=0 || U_len1[line]>MAX || U_len2[line]<=0 || U_len2[line]>MAX || U_len3[line]<=0 || U_len3[line]>MAX) {printf("Wrong data in line %d.\n", line+1); return ERROR;}
+		if (I[line] <= (MIN-tol)  || I[line] > (MAX+tol) || U_len1[line] <= (MIN-tol) || U_len1[line] > (MAX+tol) \
+		|| U_len2[line] <= (MIN-tol) || U_len2[line] > (MAX+tol) || U_len3[line] <= (MIN-tol) || U_len3[line] > (MAX+tol))
+			{printf("Wrong data in line %d.\n", line+1); return ERROR;}
 		line++;
 	}
 	fclose (read);
@@ -75,10 +94,11 @@ double Rand_Error(double U[], double I[], double R)     //Расчет случ�
 	return 1/sqrt(nmeas)*sqrt(num/denom - R*R);
 }
 	
-
 //-------------------------------------------------------------------------------------------------------------------------------------
 
-void Calculate(double I[], double U_len1[], double U_len2[], double U_len3[], double *p_len1, double *p_len2, double *p_len3, double *sigma_len1, double *sigma_len2, double *sigma_len3)
+void Calculate(double I[], double U_len1[], double U_len2[], double U_len3[], \
+               double *p_len1, double *p_len2, double *p_len3, \
+			   double *sigma_len1, double *sigma_len2, double *sigma_len3)
 {
 	double rand_len1 = 0, rand_len2 = 0, rand_len3 = 0, syst_len1 = 0, syst_len2 = 0, syst_len3 = 0;
 	R_len1 = Least_Square(U_len1, I);
@@ -104,9 +124,10 @@ void Calculate(double I[], double U_len1[], double U_len2[], double U_len3[], do
 
 //-------------------------------------------------------------------------------------------------------------------------------------
 
-int Write_Data (double *p_len1, double *p_len2, double *p_len3, double *sigma_len1, double *sigma_len2, double *sigma_len3) 
+int Write_Data (double *p_len1, double *p_len2, double *p_len3, \
+                double *sigma_len1, double *sigma_len2, double *sigma_len3, char write_file[]) 
 {
-	FILE* result = fopen("result.txt", "w");
+	FILE* result = fopen(write_file, "w");
 	if (!result) {printf("Cannot open result.txt.\n"); return ERROR;}
 	fprintf (result,"\t  Среднее сопротивление\tУдельное сопротивление\n");
 	fprintf (result,"l=20см\t\t%.4g±%.3g\t\t%.4g\n", R_len1, *sigma_len1, *p_len1*10000);
@@ -115,6 +136,14 @@ int Write_Data (double *p_len1, double *p_len2, double *p_len3, double *sigma_le
 	printf ("Mission completed!\n");
 	fclose(result);
 	return 0;
+}
+
+//-------------------------------------------------------------------------------------------------------------------------------------
+
+void MyFree (double **arr)
+{
+	free(*arr);
+	*arr = NULL;
 }
 
 	
