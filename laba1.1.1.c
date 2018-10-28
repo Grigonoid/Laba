@@ -25,6 +25,7 @@ double Rand_Error(double U[], double I[], double R);
 int Write_Data (double *p_len1, double *p_len2, double *p_len3, \
                 double *sigma_len1, double *sigma_len2, double *sigma_len3, char write_file[]); 
 void MyFree (double **arr);
+int Check_Data(double *I, double *U_len1, double *U_len2, double *U_len3, int line);
 
 //-------------------------------------------------------------------------------------------------------------------------------------	
 
@@ -61,8 +62,7 @@ int Read_Data(double *I, double *U_len1, double *U_len2, double *U_len3, char re
 	int line = 0;
 	for(;;) {
 		if (EOF == fscanf (read, "%lg %lg %lg %lg", &I[line], &U_len1[line], &U_len2[line], &U_len3[line])) break;
-		if (I[line] <= (MIN-tol)  || I[line] > (MAX+tol) || U_len1[line] <= (MIN-tol) || U_len1[line] > (MAX+tol) \
-		|| U_len2[line] <= (MIN-tol) || U_len2[line] > (MAX+tol) || U_len3[line] <= (MIN-tol) || U_len3[line] > (MAX+tol))
+		if (Check_Data(I, U_len1, U_len2, U_len3, line) == ERROR)
 			{printf("Wrong data in line %d.\n", line+1); return ERROR;}
 		line++;
 	}
@@ -146,7 +146,15 @@ void MyFree (double **arr)
 	*arr = NULL;
 }
 
-	
+//-------------------------------------------------------------------------------------------------------------------------------------
+
+int Check_Data(double *I, double *U_len1, double *U_len2, double *U_len3, int line)
+{
+	if (I[line] <= (MIN-tol) || I[line] > (MAX+tol) || U_len1[line] <= (MIN-tol) || U_len1[line] > (MAX+tol) \
+		|| U_len2[line] <= (MIN-tol) || U_len2[line] > (MAX+tol) || U_len3[line] <= (MIN-tol) || U_len3[line] > (MAX+tol))
+		return ERROR;
+		else return 0;
+}
 	
 	
 	
