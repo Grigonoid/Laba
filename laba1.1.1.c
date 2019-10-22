@@ -155,16 +155,5 @@ int Check_Data(double *I, double *U_len1, double *U_len2, double *U_len3, int li
 		return ERROR;
 		else return 0;
 }
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
 
+//Пасхалка
